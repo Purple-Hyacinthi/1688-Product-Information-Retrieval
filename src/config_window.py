@@ -1,0 +1,193 @@
+# src/config_window.py
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+class ConfigWindow:
+    def __init__(self, parent, config_manager):
+        self.parent = parent
+        self.config = config_manager
+        
+        self.window = tk.Toplevel(parent)
+        self.window.title("配置")
+        self.window.geometry("600x500")
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        self._setup_ui()
+        self._load_config()
+    
+    def _setup_ui(self):
+        notebook = ttk.Notebook(self.window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 1688 API配置页
+        api_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(api_frame, text="1688 API")
+        
+        ttk.Label(api_frame, text="App Key:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.app_key_entry = ttk.Entry(api_frame, width=50, show="*")
+        self.app_key_entry.grid(row=0, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(api_frame, text="App Secret:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.app_secret_entry = ttk.Entry(api_frame, width=50, show="*")
+        self.app_secret_entry.grid(row=1, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(api_frame, text="Access Token:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.access_token_entry = ttk.Entry(api_frame, width=50, show="*")
+        self.access_token_entry.grid(row=2, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(api_frame, text="Refresh Token:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.refresh_token_entry = ttk.Entry(api_frame, width=50, show="*")
+        self.refresh_token_entry.grid(row=3, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(api_frame, text="如何获取API密钥?").grid(row=4, column=0, columnspan=2, pady=(20, 5), sticky=tk.W)
+        
+        help_text = """1. 访问 https://open.1688.com
+2. 注册成为开放平台开发者
+3. 创建应用获取App Key和App Secret
+4. 根据文档获取Access Token"""
+        
+        help_label = ttk.Label(api_frame, text=help_text, justify=tk.LEFT)
+        help_label.grid(row=5, column=0, columnspan=2, sticky=tk.W)
+        
+        # LLM配置页
+        llm_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(llm_frame, text="LLM配置")
+        
+        ttk.Label(llm_frame, text="提供商:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.provider_var = tk.StringVar(value="openai")
+        provider_combo = ttk.Combobox(llm_frame, textvariable=self.provider_var, width=20)
+        provider_combo['values'] = ('openai', 'deepseek', 'qwen', 'ollama')
+        provider_combo.grid(row=0, column=1, pady=5, padx=(5, 0), sticky=tk.W)
+        
+        ttk.Label(llm_frame, text="API Key:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.llm_api_key_entry = ttk.Entry(llm_frame, width=50, show="*")
+        self.llm_api_key_entry.grid(row=1, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(llm_frame, text="Base URL:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.base_url_entry = ttk.Entry(llm_frame, width=50)
+        self.base_url_entry.grid(row=2, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(llm_frame, text="模型:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.model_entry = ttk.Entry(llm_frame, width=50)
+        self.model_entry.grid(row=3, column=1, pady=5, padx=(5, 0))
+        
+        ttk.Label(llm_frame, text="预设配置:").grid(row=4, column=0, sticky=tk.W, pady=(20, 5))
+        
+        preset_frame = ttk.Frame(llm_frame)
+        preset_frame.grid(row=5, column=0, columnspan=2, sticky=tk.W)
+        
+        ttk.Button(preset_frame, text="DeepSeek", 
+                  command=lambda: self._apply_preset("deepseek")).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(preset_frame, text="千问", 
+                  command=lambda: self._apply_preset("qwen")).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(preset_frame, text="Ollama", 
+                  command=lambda: self._apply_preset("ollama")).pack(side=tk.LEFT)
+        
+        # 按钮区域
+        button_frame = ttk.Frame(self.window)
+        button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        ttk.Button(button_frame, text="测试连接", command=self._test_connection).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="保存", command=self._save_config).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(button_frame, text="取消", command=self.window.destroy).pack(side=tk.RIGHT)
+    
+    def _load_config(self):
+        config = self.config.load_config()
+        
+        # 1688 API
+        api_config = config.get("1688_api", {})
+        self.app_key_entry.insert(0, api_config.get("app_key", ""))
+        self.app_secret_entry.insert(0, api_config.get("app_secret", ""))
+        self.access_token_entry.insert(0, api_config.get("access_token", ""))
+        self.refresh_token_entry.insert(0, api_config.get("refresh_token", ""))
+        
+        # LLM
+        llm_config = config.get("llm", {})
+        self.provider_var.set(llm_config.get("provider", "openai"))
+        self.llm_api_key_entry.insert(0, llm_config.get("api_key", ""))
+        self.base_url_entry.insert(0, llm_config.get("base_url", ""))
+        self.model_entry.insert(0, llm_config.get("model", ""))
+    
+    def _apply_preset(self, preset):
+        presets = {
+            "deepseek": {
+                "provider": "deepseek",
+                "base_url": "https://api.deepseek.com/v1",
+                "model": "deepseek-chat"
+            },
+            "qwen": {
+                "provider": "qwen",
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "model": "qwen-turbo"
+            },
+            "ollama": {
+                "provider": "ollama",
+                "base_url": "http://localhost:11434/v1",
+                "model": "llama2"
+            }
+        }
+        
+        if preset in presets:
+            preset_config = presets[preset]
+            self.provider_var.set(preset_config["provider"])
+            self.base_url_entry.delete(0, tk.END)
+            self.base_url_entry.insert(0, preset_config["base_url"])
+            self.model_entry.delete(0, tk.END)
+            self.model_entry.insert(0, preset_config["model"])
+    
+    def _test_connection(self):
+        from src.llm_agent import LLMAgent
+        
+        provider = self.provider_var.get()
+        api_key = self.llm_api_key_entry.get()
+        base_url = self.base_url_entry.get()
+        model = self.model_entry.get()
+        
+        test_config = {
+            "llm": {
+                "provider": provider,
+                "api_key": api_key,
+                "base_url": base_url,
+                "model": model
+            }
+        }
+        
+        class MockConfig:
+            def get(self, section, key, default=None):
+                return test_config.get(section, {}).get(key, default)
+        
+        try:
+            agent = LLMAgent(MockConfig())
+            if agent.test_connection():
+                messagebox.showinfo("测试成功", "LLM连接测试成功！")
+            else:
+                messagebox.showerror("测试失败", "LLM连接测试失败，请检查配置")
+        except Exception as e:
+            messagebox.showerror("测试错误", f"连接测试失败: {str(e)}")
+    
+    def _save_config(self):
+        config = self.config.load_config()
+        
+        # 更新1688 API配置
+        config["1688_api"].update({
+            "app_key": self.app_key_entry.get(),
+            "app_secret": self.app_secret_entry.get(),
+            "access_token": self.access_token_entry.get(),
+            "refresh_token": self.refresh_token_entry.get()
+        })
+        
+        # 更新LLM配置
+        config["llm"].update({
+            "provider": self.provider_var.get(),
+            "api_key": self.llm_api_key_entry.get(),
+            "base_url": self.base_url_entry.get(),
+            "model": self.model_entry.get()
+        })
+        
+        self.config.save_config(config)
+        messagebox.showinfo("保存成功", "配置已保存")
+        self.window.destroy()
+    
+    def destroy(self):
+        self.window.destroy()
