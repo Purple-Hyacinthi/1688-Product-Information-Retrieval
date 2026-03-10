@@ -6,23 +6,20 @@ from pathlib import Path
 class ConfigManager:
     def __init__(self, config_path="config/settings.json"):
         self.config_path = config_path
+        self._config_cache = None
         self._ensure_config_dir()
         self._ensure_default_config()
     
     def _ensure_config_dir(self):
         config_dir = os.path.dirname(self.config_path)
-        if config_dir and not os.path.exists(config_dir):
-            os.makedirs(config_dir)
+        if config_dir:
+            os.makedirs(config_dir, mode=0o700, exist_ok=True)
     
     def _ensure_default_config(self):
         if not os.path.exists(self.config_path):
             self.save_config(self._get_default_config())
     
     def _get_default_config(self):
-        import os
-        import json
-        from pathlib import Path
-        
         template_path = Path(__file__).parent.parent / "config" / "config_template.json"
         default_config = {}
         
@@ -70,34 +67,52 @@ class ConfigManager:
                     if default_config[section][key] is None:
                         default_config[section][key] = ""
         
-        if "ui" not in default_config:
-            default_config["ui"] = {
-                "window_size": "1000x700",
-                "theme": "light"
-            }
+        def ensure_section_with_defaults(config, section, defaults):
+            if section not in config:
+                config[section] = defaults
+            else:
+                for key, value in defaults.items():
+                    if key not in config[section]:
+                        config[section][key] = value
+        
+        def ensure_key_exists(section_dict, key, default_value):
+            if key not in section_dict:
+                section_dict[key] = default_value
+        
+        ensure_section_with_defaults(default_config, "ui", {
+            "window_size": "1000x700",
+            "theme": "light"
+        })
         
         if "llm" in default_config:
-            if "temperature" not in default_config["llm"]:
-                default_config["llm"]["temperature"] = 0.7
-            if "max_tokens" not in default_config["llm"]:
-                default_config["llm"]["max_tokens"] = 500
+            ensure_key_exists(default_config["llm"], "temperature", 0.7)
+            ensure_key_exists(default_config["llm"], "max_tokens", 500)
         
         if "1688_api" in default_config:
-            if "api_endpoint" not in default_config["1688_api"]:
-                default_config["1688_api"]["api_endpoint"] = "https://gw.open.1688.com/openapi"
+            ensure_key_exists(default_config["1688_api"], "api_endpoint", "https://gw.open.1688.com/openapi")
         
         return default_config
     
     def load_config(self):
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return self._get_default_config()
+        if self._config_cache is None:
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    self._config_cache = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self._config_cache = self._get_default_config()
+        return self._config_cache
+    
+    def reload(self):
+        self._config_cache = None
+        return self.load_config()
     
     def save_config(self, config_data):
-        with open(self.config_path, 'w', encoding='utf-8') as f:
-            json.dump(config_data, f, indent=2, ensure_ascii=False)
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+            self._config_cache = config_data
+        except OSError as e:
+            raise IOError(f"无法保存配置文件到 {self.config_path}: {e}")
     
     def update_section(self, section, data):
         config = self.load_config()
