@@ -1,13 +1,13 @@
 {
   "1688_api": {
-    "app_key": "",
-    "app_secret": "",
-    "access_token": "",
-    "refresh_token": ""
+    "app_key": null,
+    "app_secret": null,
+    "access_token": null,
+    "refresh_token": null
   },
   "llm": {
     "provider": "openai",
-    "api_key": "",
+    "api_key": null,
     "base_url": "https://api.openai.com/v1",
     "model": "gpt-3.5-turbo"
   },
