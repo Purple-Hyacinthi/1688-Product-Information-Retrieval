@@ -18,18 +18,27 @@ class LLMAgent:
     
     def _initialize_client(self):
         if self.provider == "ollama":
-            base_url = self.config.get("agents", "ollama", {}).get("base_url", "http://localhost:11434/v1")
-            model = self.config.get("agents", "ollama", {}).get("model", "llama2")
+            ollama_config = self.config.get("agents", "ollama", {})
+            if not isinstance(ollama_config, dict):
+                ollama_config = {}
+            base_url = ollama_config.get("base_url", "http://localhost:11434/v1")
+            model = ollama_config.get("model", "llama2")
             self.client = OpenAI(base_url=base_url, api_key="not-needed")
             self.model = model
         elif self.provider == "deepseek":
-            base_url = self.config.get("agents", "deepseek", {}).get("base_url", "https://api.deepseek.com/v1")
-            model = self.config.get("agents", "deepseek", {}).get("model", "deepseek-chat")
+            deepseek_config = self.config.get("agents", "deepseek", {})
+            if not isinstance(deepseek_config, dict):
+                deepseek_config = {}
+            base_url = deepseek_config.get("base_url", "https://api.deepseek.com/v1")
+            model = deepseek_config.get("model", "deepseek-chat")
             self.client = OpenAI(base_url=base_url, api_key=self.api_key)
             self.model = model
         elif self.provider == "qwen":
-            base_url = self.config.get("agents", "qwen", {}).get("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-            model = self.config.get("agents", "qwen", {}).get("model", "qwen-turbo")
+            qwen_config = self.config.get("agents", "qwen", {})
+            if not isinstance(qwen_config, dict):
+                qwen_config = {}
+            base_url = qwen_config.get("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+            model = qwen_config.get("model", "qwen-turbo")
             self.client = OpenAI(base_url=base_url, api_key=self.api_key)
             self.model = model
         else:  # openai兼容
@@ -39,7 +48,7 @@ class LLMAgent:
         if not products:
             return {"error": "没有可分析的商品"}
         
-        if not self.client or not self.api_key:
+        if not self.client or (self.provider != "ollama" and not self.api_key):
             return {"error": "LLM未配置"}
         
         products_info = []
@@ -87,7 +96,7 @@ class LLMAgent:
             
             return {
                 "recommended_index": recommended_idx,
-                "recommended_product": products[recommended_idx],
+                "recommended_product": products[recommended_idx].to_dict(),
                 "reason": result.get("reason", "无推荐理由"),
                 "summary": result.get("summary", ""),
                 "raw_response": result_text
@@ -98,7 +107,7 @@ class LLMAgent:
     
     def test_connection(self) -> bool:
         try:
-            if not self.client or not self.api_key:
+            if not self.client or (self.provider != "ollama" and not self.api_key):
                 return False
             
             response = self.client.chat.completions.create(
