@@ -6,10 +6,23 @@ from src.product_model import Product
 from src.config_manager import ConfigManager
 from src.alibaba_client import AlibabaAPIError
 
+def create_mock_config(access_token="test_token", auth_url=None):
+    mock_config = Mock()
+    def get_side_effect(section, key, default=None):
+        mapping = {
+            ("1688_api", "app_key"): "test_key",
+            ("1688_api", "app_secret"): "test_secret",
+            ("1688_api", "access_token"): access_token,
+        }
+        if auth_url is not None:
+            mapping[("1688_api", "auth_url")] = auth_url
+        return mapping.get((section, key), default)
+    mock_config.get = Mock(side_effect=get_side_effect)
+    return mock_config
+
 def test_alibaba_client_initialization():
     from src.alibaba_client import AlibabaClient
-    config = Mock()
-    config.get = Mock(return_value="test_key")
+    config = create_mock_config()
     client = AlibabaClient(config)
     assert client.config == config
 
@@ -35,12 +48,7 @@ def test_search_products_mock(mock_post):
     mock_response.raise_for_status = Mock()
     mock_post.return_value = mock_response
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default))
+    config = create_mock_config()
     
     client = AlibabaClient(config)
     products = client.search_products("测试商品", "测试用途", limit=10)
@@ -56,12 +64,7 @@ def test_call_api_request_exception(mock_post):
     
     mock_post.side_effect = requests.exceptions.RequestException("网络错误")
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default))
+    config = create_mock_config()
     
     client = AlibabaClient(config)
     with pytest.raises(AlibabaAPIError) as exc_info:
@@ -79,12 +82,7 @@ def test_call_api_http_error(mock_post):
     mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
     mock_post.return_value = mock_response
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default))
+    config = create_mock_config()
     
     client = AlibabaClient(config)
     with pytest.raises(AlibabaAPIError) as exc_info:
@@ -102,12 +100,7 @@ def test_call_api_json_decode_error(mock_post):
     mock_response.json.side_effect = ValueError("Invalid JSON")
     mock_post.return_value = mock_response
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default))
+    config = create_mock_config()
     
     client = AlibabaClient(config)
     with pytest.raises(AlibabaAPIError) as exc_info:
@@ -119,12 +112,7 @@ def test_call_api_json_decode_error(mock_post):
 def test_search_products_empty_response():
     from src.alibaba_client import AlibabaClient
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default))
+    config = create_mock_config()
     
     client = AlibabaClient(config)
     
@@ -144,23 +132,56 @@ def test_search_products_empty_response():
 def test_get_auth_url():
     from src.alibaba_client import AlibabaClient
     
-    config = Mock()
-    config.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token",
-        ("1688_api", "auth_url"): "https://custom.auth.url"
-    }.get((section, key), default))
+    config = create_mock_config(auth_url="https://custom.auth.url")
     
     client = AlibabaClient(config)
     assert client.get_auth_url() == "https://custom.auth.url"
     
-    config2 = Mock()
-    config2.get = Mock(side_effect=lambda section, key, default=None: {
-        ("1688_api", "app_key"): "test_key",
-        ("1688_api", "app_secret"): "test_secret",
-        ("1688_api", "access_token"): "test_token"
-    }.get((section, key), default or "https://auth.1688.com/oauth/authorize"))
+    config2 = create_mock_config()
     
     client2 = AlibabaClient(config2)
     assert client2.get_auth_url() == "https://auth.1688.com/oauth/authorize"
+
+
+def test_generate_signature():
+    from src.alibaba_client import AlibabaClient
+    
+    config = create_mock_config()
+    client = AlibabaClient(config)
+    
+    # 测试签名生成
+    params = {
+        "app_key": "test_key",
+        "timestamp": "1234567890000",
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "hmac-sha1",
+        "method": "test.method"
+    }
+    
+    # 计算签名
+    signature = client._generate_signature(params)
+    
+    # 验证签名长度和格式（base64）
+    assert isinstance(signature, str)
+    assert len(signature) > 0
+    # 可以添加更精确的验证，例如与已知值比较
+    # 但为了不暴露算法细节，我们至少确保它是base64编码
+    try:
+        import base64
+        base64.b64decode(signature)
+        assert True
+    except Exception:
+        assert False, "签名不是有效的base64编码"
+    
+    # 测试参数顺序不影响签名结果（排序后应该一致）
+    params_shuffled = {
+        "method": "test.method",
+        "v": "2.0",
+        "format": "json",
+        "timestamp": "1234567890000",
+        "app_key": "test_key",
+        "sign_method": "hmac-sha1"
+    }
+    signature2 = client._generate_signature(params_shuffled)
+    assert signature == signature2, "参数排序应不影响签名"

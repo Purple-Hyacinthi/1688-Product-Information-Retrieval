@@ -17,6 +17,9 @@ class AlibabaAPIError(Exception):
         self.original_error = original_error
 
 class AlibabaClient:
+    DEFAULT_TIMEOUT = 30
+    API_SEARCH_PRODUCTS = "com.alibaba.product:alibaba.category.searchSPUInfo-1"
+    
     def __init__(self, config_manager):
         self.config = config_manager
         self.api_endpoint = self.config.get("1688_api", "api_endpoint", "https://gw.open.1688.com/openapi")
@@ -62,7 +65,7 @@ class AlibabaClient:
             all_params["access_token"] = self.access_token
         
         try:
-            response = requests.post(self.api_endpoint, data=all_params, timeout=30)
+            response = requests.post(self.api_endpoint, data=all_params, timeout=self.DEFAULT_TIMEOUT)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -89,7 +92,7 @@ class AlibabaClient:
             "pageSize": str(limit)
         }
         
-        result = self._call_api("com.alibaba.product:alibaba.category.searchSPUInfo-1", params)
+        result = self._call_api(self.API_SEARCH_PRODUCTS, params)
         
         products = []
         if isinstance(result, dict) and "result" in result:
