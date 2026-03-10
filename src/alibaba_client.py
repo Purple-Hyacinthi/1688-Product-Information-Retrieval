@@ -19,6 +19,9 @@ class AlibabaAPIError(Exception):
 class AlibabaClient:
     DEFAULT_TIMEOUT = 30
     API_SEARCH_PRODUCTS = "com.alibaba.product:alibaba.category.searchSPUInfo-1"
+    API_FORMAT = "json"
+    API_VERSION = "2.0"
+    SIGN_METHOD = "hmac-sha1"
     
     def __init__(self, config_manager):
         self.config = config_manager
@@ -51,9 +54,9 @@ class AlibabaClient:
         base_params = {
             "app_key": self.app_key,
             "timestamp": timestamp,
-            "format": "json",
-            "v": "2.0",
-            "sign_method": "hmac-sha1",
+            "format": self.API_FORMAT,
+            "v": self.API_VERSION,
+            "sign_method": self.SIGN_METHOD,
             "method": api_name
         }
         

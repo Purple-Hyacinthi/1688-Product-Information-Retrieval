@@ -13,6 +13,7 @@ def create_mock_config(access_token="test_token", auth_url=None):
             ("1688_api", "app_key"): "test_key",
             ("1688_api", "app_secret"): "test_secret",
             ("1688_api", "access_token"): access_token,
+            ("1688_api", "api_endpoint"): "https://gw.open.1688.com/openapi",
         }
         if auth_url is not None:
             mapping[("1688_api", "auth_url")] = auth_url
@@ -153,9 +154,9 @@ def test_generate_signature():
     params = {
         "app_key": "test_key",
         "timestamp": "1234567890000",
-        "format": "json",
-        "v": "2.0",
-        "sign_method": "hmac-sha1",
+        "format": AlibabaClient.API_FORMAT,
+        "v": AlibabaClient.API_VERSION,
+        "sign_method": AlibabaClient.SIGN_METHOD,
         "method": "test.method"
     }
     
@@ -177,11 +178,11 @@ def test_generate_signature():
     # 测试参数顺序不影响签名结果（排序后应该一致）
     params_shuffled = {
         "method": "test.method",
-        "v": "2.0",
-        "format": "json",
+        "v": AlibabaClient.API_VERSION,
+        "format": AlibabaClient.API_FORMAT,
         "timestamp": "1234567890000",
         "app_key": "test_key",
-        "sign_method": "hmac-sha1"
+        "sign_method": AlibabaClient.SIGN_METHOD
     }
     signature2 = client._generate_signature(params_shuffled)
     assert signature == signature2, "参数排序应不影响签名"
