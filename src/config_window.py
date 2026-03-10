@@ -137,6 +137,16 @@ class ConfigWindow:
             self.model_entry.insert(0, preset_config["model"])
     
     def _test_connection(self):
+        # 测试1688 API连接（检查凭证是否填写）
+        app_key = self.app_key_entry.get()
+        app_secret = self.app_secret_entry.get()
+        
+        if app_key and app_secret:
+            messagebox.showinfo("1688 API配置", "1688 API凭证已填写（未进行实际连接测试）")
+        else:
+            messagebox.showwarning("1688 API配置", "1688 API凭证未填写，请填写App Key和App Secret")
+        
+        # 测试LLM连接
         from src.llm_agent import LLMAgent
         
         provider = self.provider_var.get()
@@ -164,10 +174,16 @@ class ConfigWindow:
             else:
                 messagebox.showerror("测试失败", "LLM连接测试失败，请检查配置")
         except Exception as e:
-            messagebox.showerror("测试错误", f"连接测试失败: {str(e)}")
+            messagebox.showerror("测试错误", f"LLM连接测试失败: {str(e)}")
     
     def _save_config(self):
         config = self.config.load_config()
+        
+        # 确保配置部分存在
+        if "1688_api" not in config:
+            config["1688_api"] = {}
+        if "llm" not in config:
+            config["llm"] = {}
         
         # 更新1688 API配置
         config["1688_api"].update({
