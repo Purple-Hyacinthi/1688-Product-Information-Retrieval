@@ -1,0 +1,28 @@
+{
+  "1688_api": {
+    "app_key": "",
+    "app_secret": "",
+    "access_token": "",
+    "refresh_token": ""
+  },
+  "llm": {
+    "provider": "openai",
+    "api_key": "",
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-3.5-turbo"
+  },
+  "agents": {
+    "deepseek": {
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat"
+    },
+    "qwen": {
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-turbo"
+    },
+    "ollama": {
+      "base_url": "http://localhost:11434/v1",
+      "model": "llama2"
+    }
+  }
+}
