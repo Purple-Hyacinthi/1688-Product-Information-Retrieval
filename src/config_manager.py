@@ -43,7 +43,8 @@ class ConfigManager:
                     "app_secret": "",
                     "access_token": "",
                     "refresh_token": "",
-                    "api_endpoint": "https://gw.open.1688.com/openapi"
+                    "api_endpoint": "https://gw.open.1688.com/openapi",
+                    "auth_url": "https://auth.1688.com/oauth/authorize"
                 },
                 self.SECTION_LLM: {
                     "provider": "openai",
@@ -96,6 +97,7 @@ class ConfigManager:
         
         if self.SECTION_1688_API in default_config:
             ensure_key_exists(default_config[self.SECTION_1688_API], "api_endpoint", "https://gw.open.1688.com/openapi")
+            ensure_key_exists(default_config[self.SECTION_1688_API], "auth_url", "https://auth.1688.com/oauth/authorize")
         
         return default_config
     

@@ -4,10 +4,17 @@ import hashlib
 import hmac
 import base64
 import json
+import logging
 import requests
 from urllib.parse import quote
 from typing import List, Optional
 from src.product_model import Product
+
+
+class AlibabaAPIError(Exception):
+    def __init__(self, message, original_error=None):
+        super().__init__(message)
+        self.original_error = original_error
 
 class AlibabaClient:
     def __init__(self, config_manager):
@@ -16,12 +23,13 @@ class AlibabaClient:
         self.app_key = self.config.get("1688_api", "app_key")
         self.app_secret = self.config.get("1688_api", "app_secret")
         self.access_token = self.config.get("1688_api", "access_token")
+        self.auth_url = self.config.get("1688_api", "auth_url", "https://auth.1688.com/oauth/authorize")
     
     def _generate_signature(self, params):
         sorted_params = sorted(params.items())
         canonicalized_query = ""
         for key, value in sorted_params:
-            canonicalized_query += f"{key}{value}"
+            canonicalized_query += f"{key}{str(value)}"
         
         signature = hmac.new(
             self.app_secret.encode('utf-8'),
@@ -58,10 +66,24 @@ class AlibabaClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"API调用失败: {e}")
-            return {"error": str(e)}
+            logging.error(f"API调用失败: {e}")
+            raise AlibabaAPIError(f"API调用失败: {e}", original_error=e)
+        except (json.JSONDecodeError, ValueError) as e:
+            logging.error(f"API响应JSON解析失败: {e}")
+            raise AlibabaAPIError(f"API响应JSON解析失败: {e}", original_error=e)
     
     def search_products(self, keyword: str, purpose: str = "", limit: int = 10) -> List[Product]:
+        """
+        搜索1688商品
+        
+        Args:
+            keyword: 搜索关键词
+            purpose: 预留参数，供将来按用途筛选使用（当前未使用）
+            limit: 返回商品数量限制
+        
+        Returns:
+            商品对象列表
+        """
         params = {
             "keywords": keyword,
             "pageSize": str(limit)
@@ -90,4 +112,4 @@ class AlibabaClient:
         return products
     
     def get_auth_url(self):
-        return "https://auth.1688.com/oauth/authorize"
+        return self.auth_url

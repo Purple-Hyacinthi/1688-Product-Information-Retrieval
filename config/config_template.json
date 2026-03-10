@@ -3,7 +3,8 @@
     "app_key": null,
     "app_secret": null,
     "access_token": null,
-    "refresh_token": null
+    "refresh_token": null,
+    "auth_url": null
   },
   "llm": {
     "provider": "openai",
