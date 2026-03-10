@@ -4,6 +4,12 @@ import json
 from pathlib import Path
 
 class ConfigManager:
+    CONFIG_DIR_PERMISSIONS = 0o700
+    SECTION_1688_API = "1688_api"
+    SECTION_LLM = "llm"
+    SECTION_UI = "ui"
+    SECTION_AGENTS = "agents"
+    
     def __init__(self, config_path="config/settings.json"):
         self.config_path = config_path
         self._config_cache = None
@@ -13,7 +19,7 @@ class ConfigManager:
     def _ensure_config_dir(self):
         config_dir = os.path.dirname(self.config_path)
         if config_dir:
-            os.makedirs(config_dir, mode=0o700, exist_ok=True)
+            os.makedirs(config_dir, mode=self.CONFIG_DIR_PERMISSIONS, exist_ok=True)
     
     def _ensure_default_config(self):
         if not os.path.exists(self.config_path):
@@ -32,20 +38,20 @@ class ConfigManager:
         
         if not default_config:
             default_config = {
-                "1688_api": {
+                self.SECTION_1688_API: {
                     "app_key": "",
                     "app_secret": "",
                     "access_token": "",
                     "refresh_token": "",
                     "api_endpoint": "https://gw.open.1688.com/openapi"
                 },
-                "llm": {
+                self.SECTION_LLM: {
                     "provider": "openai",
                     "api_key": "",
                     "base_url": "https://api.openai.com/v1",
                     "model": "gpt-3.5-turbo"
                 },
-                "agents": {
+                self.SECTION_AGENTS: {
                     "deepseek": {
                         "base_url": "https://api.deepseek.com/v1",
                         "model": "deepseek-chat"
@@ -61,7 +67,7 @@ class ConfigManager:
                 }
             }
         
-        for section in ["1688_api", "llm"]:
+        for section in [self.SECTION_1688_API, self.SECTION_LLM]:
             if section in default_config:
                 for key in default_config[section]:
                     if default_config[section][key] is None:
@@ -79,17 +85,17 @@ class ConfigManager:
             if key not in section_dict:
                 section_dict[key] = default_value
         
-        ensure_section_with_defaults(default_config, "ui", {
+        ensure_section_with_defaults(default_config, self.SECTION_UI, {
             "window_size": "1000x700",
             "theme": "light"
         })
         
-        if "llm" in default_config:
-            ensure_key_exists(default_config["llm"], "temperature", 0.7)
-            ensure_key_exists(default_config["llm"], "max_tokens", 500)
+        if self.SECTION_LLM in default_config:
+            ensure_key_exists(default_config[self.SECTION_LLM], "temperature", 0.7)
+            ensure_key_exists(default_config[self.SECTION_LLM], "max_tokens", 500)
         
-        if "1688_api" in default_config:
-            ensure_key_exists(default_config["1688_api"], "api_endpoint", "https://gw.open.1688.com/openapi")
+        if self.SECTION_1688_API in default_config:
+            ensure_key_exists(default_config[self.SECTION_1688_API], "api_endpoint", "https://gw.open.1688.com/openapi")
         
         return default_config
     
@@ -98,7 +104,7 @@ class ConfigManager:
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     self._config_cache = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
+            except (OSError, json.JSONDecodeError):
                 self._config_cache = self._get_default_config()
         return self._config_cache
     
@@ -111,7 +117,7 @@ class ConfigManager:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(config_data, f, indent=2, ensure_ascii=False)
             self._config_cache = config_data
-        except OSError as e:
+        except (OSError, TypeError, ValueError) as e:
             raise IOError(f"无法保存配置文件到 {self.config_path}: {e}")
     
     def update_section(self, section, data):
@@ -123,4 +129,7 @@ class ConfigManager:
     
     def get(self, section, key, default=None):
         config = self.load_config()
-        return config.get(section, {}).get(key, default)
+        section_data = config.get(section)
+        if not isinstance(section_data, dict):
+            return default
+        return section_data.get(key, default)
