@@ -1,0 +1,182 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build Windows executable
+      run: |
+        # Clean previous builds
+        if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+        if (Test-Path build) { Remove-Item -Recurse -Force build }
+        
+        # Build with spec file
+        pyinstaller --clean --noconfirm build.spec
+        
+        # Create release directory
+        $version = "${{ github.ref_name }}"
+        if ($version -eq "") { $version = "dev" }
+        $release_dir = "release-windows"
+        New-Item -ItemType Directory -Force -Path $release_dir
+        
+        # Copy files
+        Copy-Item -Path "dist/1688_Product_Search/1688_Product_Search.exe" -Destination "$release_dir/"
+        Copy-Item -Recurse -Path "config" -Destination "$release_dir/"
+        Copy-Item -Path "README.md" -Destination "$release_dir/"
+        
+        # Create simple run script
+        "echo Starting 1688 Product Search..." | Out-File -FilePath "$release_dir/run.bat" -Encoding ASCII
+        "echo Please ensure config/settings.json is configured" | Add-Content -Path "$release_dir/run.bat"
+        "echo." | Add-Content -Path "$release_dir/run.bat"
+        "1688_Product_Search.exe" | Add-Content -Path "$release_dir/run.bat"
+        "pause" | Add-Content -Path "$release_dir/run.bat"
+    
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 1688-product-search-windows
+        path: release-windows/
+        retention-days: 7
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build macOS app
+      run: |
+        # Clean previous builds
+        rm -rf dist build
+        
+        # Build with spec file
+        pyinstaller --clean --noconfirm build.spec
+        
+        # Create release directory
+        version="${GITHUB_REF_NAME:-dev}"
+        release_dir="release-macos"
+        mkdir -p "$release_dir"
+        
+        # Copy app bundle
+        if [ -d "dist/1688 Product Search.app" ]; then
+          cp -R "dist/1688 Product Search.app" "$release_dir/"
+          chmod +x "$release_dir/1688 Product Search.app/Contents/MacOS/1688_Product_Search"
+        elif [ -f "dist/1688_Product_Search" ]; then
+          cp "dist/1688_Product_Search" "$release_dir/"
+          chmod +x "$release_dir/1688_Product_Search"
+        fi
+        
+        # Copy config and docs
+        cp -R config "$release_dir/"
+        cp README.md "$release_dir/"
+        
+        # Create simple run script
+        echo '#!/bin/bash' > "$release_dir/run.sh"
+        echo 'echo "Starting 1688 Product Search..."' >> "$release_dir/run.sh"
+        echo 'echo "Note: Please configure config/settings.json first"' >> "$release_dir/run.sh"
+        echo '' >> "$release_dir/run.sh"
+        if [ -d "$release_dir/1688 Product Search.app" ]; then
+          echo 'open "1688 Product Search.app"' >> "$release_dir/run.sh"
+        else
+          echo './1688_Product_Search' >> "$release_dir/run.sh"
+        fi
+        chmod +x "$release_dir/run.sh"
+    
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 1688-product-search-macos
+        path: release-macos/
+        retention-days: 7
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download artifacts
+      run: mkdir -p release-files
+    
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: 1688-product-search-windows
+        path: release-files/windows
+    
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: 1688-product-search-macos
+        path: release-files/macos
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release-files/windows/**
+          release-files/macos/**
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
