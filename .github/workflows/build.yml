@@ -43,7 +43,6 @@ jobs:
         $release_dir = "release-windows"
         New-Item -ItemType Directory -Force -Path $release_dir
         
-        # Only copy the EXE and config folder
         if (Test-Path "dist/1688_Product_Search.exe") {
             Copy-Item -Path "dist/1688_Product_Search.exe" -Destination "$release_dir/"
         } elseif (Test-Path "dist/1688_Product_Search/1688_Product_Search.exe") {
@@ -91,7 +90,6 @@ jobs:
         release_dir="release-macos"
         mkdir -p "$release_dir"
         
-        # Only copy the app/binary and config folder
         if [ -d "dist/1688 Product Search.app" ]; then
           cp -R "dist/1688 Product Search.app" "$release_dir/"
         elif [ -f "dist/1688_Product_Search" ]; then
@@ -118,6 +116,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
     - name: Determine tag name
       id: get_tag
       run: |
@@ -147,9 +150,8 @@ jobs:
         name: 1688-product-search-macos
         path: release-files/macos
 
-    - name: Create source code archive (full project, including README.md)
+    - name: Create source code archive
       run: |
-        # Simply zip the entire repo — this is standard for source releases
         zip -r source-code.zip . -x "*.git*" -x "release-files/*" -x "release-windows/*" -x "release-macos/*"
 
     - name: Create GitHub Release
