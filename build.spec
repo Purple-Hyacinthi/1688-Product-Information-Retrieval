@@ -49,14 +49,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='1688_Product_Search',
+    onefile=True,
 )
