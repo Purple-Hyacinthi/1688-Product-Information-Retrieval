@@ -43,12 +43,10 @@ jobs:
         pyinstaller --clean --noconfirm build.spec
         
         # Create release directory
-        $version = "${{ github.ref_name }}"
-        if ($version -eq "") { $version = "dev" }
         $release_dir = "release-windows"
         New-Item -ItemType Directory -Force -Path $release_dir
         
-        # Copy files
+        # Copy only the executable and config (NO scripts, NO README)
         if (Test-Path "dist/1688_Product_Search.exe") {
             Copy-Item -Path "dist/1688_Product_Search.exe" -Destination "$release_dir/"
         } elseif (Test-Path "dist/1688_Product_Search/1688_Product_Search.exe") {
@@ -58,14 +56,6 @@ jobs:
             exit 1
         }
         Copy-Item -Recurse -Path "config" -Destination "$release_dir/"
-        Copy-Item -Path "README.md" -Destination "$release_dir/"
-        
-        # Create simple run script
-        "echo Starting 1688 Product Search..." | Out-File -FilePath "$release_dir/run.bat" -Encoding ASCII
-        "echo Please ensure config/settings.json is configured" | Add-Content -Path "$release_dir/run.bat"
-        "echo." | Add-Content -Path "$release_dir/run.bat"
-        "1688_Product_Search.exe" | Add-Content -Path "$release_dir/run.bat"
-        "pause" | Add-Content -Path "$release_dir/run.bat"
     
     - name: Upload Windows artifact
       uses: actions/upload-artifact@v4
@@ -104,11 +94,10 @@ jobs:
         pyinstaller --clean --noconfirm build.spec
         
         # Create release directory
-        version="${GITHUB_REF_NAME:-dev}"
         release_dir="release-macos"
         mkdir -p "$release_dir"
         
-        # Copy app bundle or binary
+        # Copy only the app bundle or binary and config (NO scripts, NO README)
         if [ -d "dist/1688 Product Search.app" ]; then
           cp -R "dist/1688 Product Search.app" "$release_dir/"
           chmod +x "$release_dir/1688 Product Search.app/Contents/MacOS/1688_Product_Search"
@@ -120,24 +109,11 @@ jobs:
           exit 1
         fi
         
-        # Copy config and docs
+        # Copy config only (NO README, NO scripts)
         cp -R config "$release_dir/"
-        cp README.md "$release_dir/"
-        
-        # Create run script
-        echo '#!/bin/bash' > "$release_dir/run.sh"
-        echo 'echo "Starting 1688 Product Search..."' >> "$release_dir/run.sh"
-        echo 'echo "Note: Please configure config/settings.json first"' >> "$release_dir/run.sh"
-        echo '' >> "$release_dir/run.sh"
-        if [ -d "$release_dir/1688 Product Search.app" ]; then
-          echo 'open "1688 Product Search.app"' >> "$release_dir/run.sh"
-        else
-          echo './1688_Product_Search' >> "$release_dir/run.sh"
-        fi
-        chmod +x "$release_dir/run.sh"
     
     - name: Upload macOS artifact
-      uses: actions/download-artifact@v4
+      uses: actions/upload-artifact@v4
       with:
         name: 1688-product-search-macos
         path: release-macos/
@@ -148,7 +124,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Only run if it's a tag push OR manually dispatched
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     
     steps:
@@ -162,7 +137,6 @@ jobs:
             exit 1
           fi
         else
-          # Extract tag from ref (e.g., refs/tags/v1.2.3 -> v1.2.3)
           TAG="${GITHUB_REF#refs/tags/}"
         fi
         echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -182,6 +156,11 @@ jobs:
         name: 1688-product-search-macos
         path: release-files/macos
 
+    - name: Prepare source code (without README.md)
+      run: |
+        # Create source code archive excluding README.md and other unnecessary files
+        zip -r source-code.zip . -x "README.md" -x ".git/*" -x "release-files/*" -x "release-windows/*" -x "release-macos/*" -x "*.git*"
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
@@ -190,7 +169,8 @@ jobs:
         files: |
           release-files/windows/**
           release-files/macos/**
-        overwrite_files: true  # ✅ 关键修复：添加此参数
+          source-code.zip
+        overwrite_files: true
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
