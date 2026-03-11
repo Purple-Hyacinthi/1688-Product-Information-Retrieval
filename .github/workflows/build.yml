@@ -44,7 +44,15 @@ jobs:
         New-Item -ItemType Directory -Force -Path $release_dir
         
         # Copy files
-        Copy-Item -Path "dist/1688_Product_Search/1688_Product_Search.exe" -Destination "$release_dir/"
+        # Check for single-file executable (onefile mode)
+        if (Test-Path "dist/1688_Product_Search.exe") {
+            Copy-Item -Path "dist/1688_Product_Search.exe" -Destination "$release_dir/"
+        } elseif (Test-Path "dist/1688_Product_Search/1688_Product_Search.exe") {
+            Copy-Item -Path "dist/1688_Product_Search/1688_Product_Search.exe" -Destination "$release_dir/"
+        } else {
+            Write-Error "Executable not found in dist directory"
+            exit 1
+        }
         Copy-Item -Recurse -Path "config" -Destination "$release_dir/"
         Copy-Item -Path "README.md" -Destination "$release_dir/"
         
