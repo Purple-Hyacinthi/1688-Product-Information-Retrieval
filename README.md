@@ -46,17 +46,7 @@ src/
 └── config_window.py    # 配置窗口
 ```
 
-## 打包版本
-
-项目已打包为Windows可执行文件，位于`APP/`目录中：
-
-1. 运行 `APP/1688_Product_Search.exe` 即可使用，无需安装Python环境
-2. 首次运行前，请复制 `APP/config/settings.example.json` 为 `settings.json` 并配置API密钥
-3. 如需重新打包，请参考 `PACKAGING_GUIDE.md`
-
 ## 注意事项
 1. 需要有效的1688开放平台API密钥
 2. LLM API需要有效的API密钥或本地服务
 3. 商品搜索受1688 API限制
-4. Windows可执行文件已包含所有依赖（约280MB）
-5. macOS打包需要macOS环境，请参考打包指南
