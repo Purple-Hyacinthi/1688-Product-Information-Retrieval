@@ -35,18 +35,15 @@ jobs:
     
     - name: Build Windows executable
       run: |
-        # Clean previous builds
         if (Test-Path dist) { Remove-Item -Recurse -Force dist }
         if (Test-Path build) { Remove-Item -Recurse -Force build }
         
-        # Build with spec file
         pyinstaller --clean --noconfirm build.spec
         
-        # Create release directory
         $release_dir = "release-windows"
         New-Item -ItemType Directory -Force -Path $release_dir
         
-        # Copy only the executable and config (NO scripts, NO README)
+        # Only copy the EXE and config folder
         if (Test-Path "dist/1688_Product_Search.exe") {
             Copy-Item -Path "dist/1688_Product_Search.exe" -Destination "$release_dir/"
         } elseif (Test-Path "dist/1688_Product_Search/1688_Product_Search.exe") {
@@ -87,29 +84,23 @@ jobs:
     
     - name: Build macOS app
       run: |
-        # Clean previous builds
         rm -rf dist build
         
-        # Build with spec file
         pyinstaller --clean --noconfirm build.spec
         
-        # Create release directory
         release_dir="release-macos"
         mkdir -p "$release_dir"
         
-        # Copy only the app bundle or binary and config (NO scripts, NO README)
+        # Only copy the app/binary and config folder
         if [ -d "dist/1688 Product Search.app" ]; then
           cp -R "dist/1688 Product Search.app" "$release_dir/"
-          chmod +x "$release_dir/1688 Product Search.app/Contents/MacOS/1688_Product_Search"
         elif [ -f "dist/1688_Product_Search" ]; then
           cp "dist/1688_Product_Search" "$release_dir/"
-          chmod +x "$release_dir/1688_Product_Search"
         else
           echo "Error: Executable not found in dist/"
           exit 1
         fi
         
-        # Copy config only (NO README, NO scripts)
         cp -R config "$release_dir/"
     
     - name: Upload macOS artifact
@@ -156,10 +147,10 @@ jobs:
         name: 1688-product-search-macos
         path: release-files/macos
 
-    - name: Prepare source code (without README.md)
+    - name: Create source code archive (full project, including README.md)
       run: |
-        # Create source code archive excluding README.md and other unnecessary files
-        zip -r source-code.zip . -x "README.md" -x ".git/*" -x "release-files/*" -x "release-windows/*" -x "release-macos/*" -x "*.git*"
+        # Simply zip the entire repo — this is standard for source releases
+        zip -r source-code.zip . -x "*.git*" -x "release-files/*" -x "release-windows/*" -x "release-macos/*"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
