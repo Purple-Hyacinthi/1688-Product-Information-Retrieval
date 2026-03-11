@@ -78,18 +78,22 @@ def test_call_api_request_exception(mock_post):
 @patch('requests.post')
 def test_call_api_http_error(mock_post):
     from src.alibaba_client import AlibabaClient
-    
+
     mock_response = Mock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
+    mock_response.status_code = 404
+    http_error = requests.exceptions.HTTPError("404 Not Found")
+    http_error.response = mock_response
+    mock_response.raise_for_status.side_effect = http_error
     mock_post.return_value = mock_response
-    
+
     config = create_mock_config()
-    
+
     client = AlibabaClient(config)
     with pytest.raises(AlibabaAPIError) as exc_info:
         client.search_products("测试")
-    
-    assert "API调用失败" in str(exc_info.value)
+
+    assert "HTTP错误 404" in str(exc_info.value)
+    assert "API端点不存在" in str(exc_info.value)
 
 
 @patch('requests.post')

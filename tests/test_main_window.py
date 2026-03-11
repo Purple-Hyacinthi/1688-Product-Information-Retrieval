@@ -21,7 +21,8 @@ def test_main_window_creation():
     
     root.destroy()
 
-def test_search_products_validation():
+@patch('tkinter.messagebox.showwarning')
+def test_search_products_validation(mock_showwarning):
     root = tk.Tk()
     root.withdraw()
     
@@ -36,8 +37,8 @@ def test_search_products_validation():
     window.product_entry.insert(0, "")
     window._search_products()
     
-    # 应该显示警告，但我们需要验证状态
-    # 由于是UI测试，我们只验证函数没有崩溃
+    # 验证显示了警告
+    mock_showwarning.assert_called_once()
     
     root.destroy()
 

@@ -93,21 +93,46 @@ class ConfigWindow:
         ttk.Button(button_frame, text="取消", command=self.window.destroy).pack(side=tk.RIGHT)
     
     def _load_config(self):
-        config = self.config.load_config()
-        
-        # 1688 API
-        api_config = config.get("1688_api", {})
-        self.app_key_entry.insert(0, api_config.get("app_key", ""))
-        self.app_secret_entry.insert(0, api_config.get("app_secret", ""))
-        self.access_token_entry.insert(0, api_config.get("access_token", ""))
-        self.refresh_token_entry.insert(0, api_config.get("refresh_token", ""))
-        
-        # LLM
-        llm_config = config.get("llm", {})
-        self.provider_var.set(llm_config.get("provider", "openai"))
-        self.llm_api_key_entry.insert(0, llm_config.get("api_key", ""))
-        self.base_url_entry.insert(0, llm_config.get("base_url", ""))
-        self.model_entry.insert(0, llm_config.get("model", ""))
+        try:
+            config = self.config.load_config()
+            
+            # 1688 API
+            api_config = config.get("1688_api", {})
+            self._safe_entry_insert(self.app_key_entry, api_config.get("app_key", ""))
+            self._safe_entry_insert(self.app_secret_entry, api_config.get("app_secret", ""))
+            self._safe_entry_insert(self.access_token_entry, api_config.get("access_token", ""))
+            self._safe_entry_insert(self.refresh_token_entry, api_config.get("refresh_token", ""))
+            
+            # LLM
+            llm_config = config.get("llm", {})
+            if hasattr(self, 'provider_var'):
+                self.provider_var.set(llm_config.get("provider", "openai"))
+            self._safe_entry_insert(self.llm_api_key_entry, llm_config.get("api_key", ""))
+            self._safe_entry_insert(self.base_url_entry, llm_config.get("base_url", ""))
+            self._safe_entry_insert(self.model_entry, llm_config.get("model", ""))
+        except Exception as e:
+            import traceback
+            print(f"加载配置时出错: {e}")
+            print(traceback.format_exc())
+    
+    def _safe_entry_insert(self, entry_widget, text):
+        """安全地向Entry组件插入文本"""
+        if entry_widget and hasattr(entry_widget, 'insert'):
+            try:
+                entry_widget.delete(0, tk.END)
+                entry_widget.insert("0", str(text) if text is not None else "")
+            except Exception:
+                # 如果插入失败，静默处理
+                pass
+    
+    def _safe_entry_get(self, entry_widget, default=""):
+        """安全地从Entry组件获取文本"""
+        if entry_widget and hasattr(entry_widget, 'get'):
+            try:
+                return entry_widget.get()
+            except Exception:
+                return default
+        return default
     
     def _apply_preset(self, preset):
         presets = {
@@ -130,16 +155,15 @@ class ConfigWindow:
         
         if preset in presets:
             preset_config = presets[preset]
-            self.provider_var.set(preset_config["provider"])
-            self.base_url_entry.delete(0, tk.END)
-            self.base_url_entry.insert(0, preset_config["base_url"])
-            self.model_entry.delete(0, tk.END)
-            self.model_entry.insert(0, preset_config["model"])
+            if hasattr(self, 'provider_var'):
+                self.provider_var.set(preset_config["provider"])
+            self._safe_entry_insert(self.base_url_entry, preset_config["base_url"])
+            self._safe_entry_insert(self.model_entry, preset_config["model"])
     
     def _test_connection(self):
         # 测试1688 API连接（检查凭证是否填写）
-        app_key = self.app_key_entry.get()
-        app_secret = self.app_secret_entry.get()
+        app_key = self._safe_entry_get(self.app_key_entry)
+        app_secret = self._safe_entry_get(self.app_secret_entry)
         
         if app_key and app_secret:
             messagebox.showinfo("1688 API配置", "1688 API凭证已填写（未进行实际连接测试）")
@@ -149,10 +173,10 @@ class ConfigWindow:
         # 测试LLM连接
         from src.llm_agent import LLMAgent
         
-        provider = self.provider_var.get()
-        api_key = self.llm_api_key_entry.get()
-        base_url = self.base_url_entry.get()
-        model = self.model_entry.get()
+        provider = self.provider_var.get() if hasattr(self, 'provider_var') else "openai"
+        api_key = self._safe_entry_get(self.llm_api_key_entry)
+        base_url = self._safe_entry_get(self.base_url_entry)
+        model = self._safe_entry_get(self.model_entry)
         
         test_config = {
             "llm": {
@@ -187,18 +211,19 @@ class ConfigWindow:
         
         # 更新1688 API配置
         config["1688_api"].update({
-            "app_key": self.app_key_entry.get(),
-            "app_secret": self.app_secret_entry.get(),
-            "access_token": self.access_token_entry.get(),
-            "refresh_token": self.refresh_token_entry.get()
+            "app_key": self._safe_entry_get(self.app_key_entry),
+            "app_secret": self._safe_entry_get(self.app_secret_entry),
+            "access_token": self._safe_entry_get(self.access_token_entry),
+            "refresh_token": self._safe_entry_get(self.refresh_token_entry)
         })
         
         # 更新LLM配置
+        provider = self.provider_var.get() if hasattr(self, 'provider_var') else "openai"
         config["llm"].update({
-            "provider": self.provider_var.get(),
-            "api_key": self.llm_api_key_entry.get(),
-            "base_url": self.base_url_entry.get(),
-            "model": self.model_entry.get()
+            "provider": provider,
+            "api_key": self._safe_entry_get(self.llm_api_key_entry),
+            "base_url": self._safe_entry_get(self.base_url_entry),
+            "model": self._safe_entry_get(self.model_entry)
         })
         
         self.config.save_config(config)

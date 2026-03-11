@@ -24,6 +24,36 @@ class MainWindow:
     ANALYSIS_ERROR_MSG = "分析错误"
     READY_STATUS_MSG = "就绪"
     
+    @staticmethod
+    def _clean_input(text: str, max_length: int = 200, allow_empty: bool = False) -> str:
+        """
+        清理用户输入文本
+        
+        Args:
+            text: 原始输入文本
+            max_length: 最大长度限制
+            allow_empty: 是否允许空字符串
+        
+        Returns:
+            清理后的文本，如果输入无效返回空字符串
+        """
+        if not isinstance(text, str):
+            return ""
+        
+        cleaned = text.strip()
+        
+        # 限制长度
+        if len(cleaned) > max_length:
+            cleaned = cleaned[:max_length]
+        
+        # 去除多余空白字符（多个 空格、换行等）
+        cleaned = ' '.join(cleaned.split())
+        
+        # 如果允许空字符串或清理后有内容，则返回
+        if allow_empty or cleaned:
+            return cleaned
+        return ""
+    
     def __init__(self, root, config_manager, alibaba_client, llm_agent):
         self.root = root
         self.config = config_manager
@@ -36,8 +66,15 @@ class MainWindow:
         self.products: List[Product] = []
         self.current_purpose: str = ""
         
+        # 检查依赖状态
+        self.alibaba_client_available = alibaba_client is not None
+        self.llm_agent_available = llm_agent is not None
+        
         self._setup_ui()
         self._load_config_to_ui()
+        
+        # 显示配置状态
+        self._show_config_status()
     
     def _setup_ui(self):
         main_frame = ttk.Frame(self.root, padding="10")
@@ -165,12 +202,53 @@ class MainWindow:
         except Exception:
             pass
     
+    def _show_config_status(self):
+        """显示配置状态信息"""
+        status_parts = []
+        
+        if not self.alibaba_client_available:
+            status_parts.append("1688 API不可用")
+        else:
+            # 检查API密钥是否配置
+            api_key = self.config.get("1688_api", "app_key", "")
+            api_secret = self.config.get("1688_api", "app_secret", "")
+            if api_key and api_secret:
+                status_parts.append("1688 API已配置")
+            else:
+                status_parts.append("1688 API未配置")
+        
+        if not self.llm_agent_available:
+            status_parts.append("LLM代理不可用")
+        else:
+            llm_provider = self.config.get("llm", "provider", "openai")
+            llm_api_key = self.config.get("llm", "api_key", "")
+            if llm_provider == "ollama" or llm_api_key:
+                status_parts.append("LLM代理已配置")
+            else:
+                status_parts.append("LLM代理未配置")
+        
+        status_text = " | ".join(status_parts) if status_parts else "配置正常"
+        self.status_var.set(f"就绪 - {status_text}")
+    
     def _search_products(self):
-        keyword = self.product_entry.get().strip()
-        purpose = self.purpose_entry.get().strip()
+        # 检查1688 API客户端是否可用
+        if not self.alibaba_client_available or self.alibaba_client is None:
+            messagebox.showerror("功能不可用", "1688 API客户端不可用，请检查配置")
+            return
+        
+        raw_keyword = self.product_entry.get()
+        raw_purpose = self.purpose_entry.get()
+        
+        keyword = self._clean_input(raw_keyword, max_length=100, allow_empty=False)
+        purpose = self._clean_input(raw_purpose, max_length=200, allow_empty=True)
         
         if not keyword:
-            messagebox.showwarning(self.INPUT_ERROR_MSG, "请输入商品名称")
+            messagebox.showwarning(self.INPUT_ERROR_MSG, "请输入有效的商品名称（1-100个字符）")
+            return
+        
+        # 进一步验证关键词是否包含有效内容（不只是数字或符号）
+        if not any(c.isalpha() for c in keyword):
+            messagebox.showwarning(self.INPUT_ERROR_MSG, "商品名称应包含文字描述")
             return
         
         self.current_purpose = purpose
@@ -218,12 +296,21 @@ class MainWindow:
             self.recommendation_text.delete(1.0, tk.END)
     
     def _analyze_with_agent(self):
+        # 检查LLM代理是否可用
+        if not self.llm_agent_available or self.llm_agent is None:
+            messagebox.showerror("功能不可用", "LLM代理不可用，请检查配置")
+            return
+        
         if not self.products:
             messagebox.showwarning(self.NO_DATA_MSG, "请先搜索商品")
             return
         
-        if not self.llm_agent.test_connection():
-            messagebox.showwarning(self.CONNECTION_FAILED_MSG, "LLM连接失败，请检查配置")
+        try:
+            if not self.llm_agent.test_connection():
+                messagebox.showwarning(self.CONNECTION_FAILED_MSG, "LLM连接失败，请检查配置")
+                return
+        except Exception as e:
+            messagebox.showerror(self.CONNECTION_FAILED_MSG, f"LLM连接测试失败: {str(e)}")
             return
         
         self.status_var.set("智能体分析中...")

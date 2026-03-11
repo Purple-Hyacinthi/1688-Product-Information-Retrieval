@@ -26,6 +26,9 @@ class LLMAgent:
             self.client = OpenAI(base_url=base_url, api_key="not-needed")
             self.model = model
         elif self.provider == "deepseek":
+            if not self.api_key:
+                self.client = None
+                return
             deepseek_config = self.config.get("agents", "deepseek", {})
             if not isinstance(deepseek_config, dict):
                 deepseek_config = {}
@@ -34,6 +37,9 @@ class LLMAgent:
             self.client = OpenAI(base_url=base_url, api_key=self.api_key)
             self.model = model
         elif self.provider == "qwen":
+            if not self.api_key:
+                self.client = None
+                return
             qwen_config = self.config.get("agents", "qwen", {})
             if not isinstance(qwen_config, dict):
                 qwen_config = {}
@@ -42,6 +48,9 @@ class LLMAgent:
             self.client = OpenAI(base_url=base_url, api_key=self.api_key)
             self.model = model
         else:  # openai兼容
+            if not self.api_key:
+                self.client = None
+                return
             self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
     
     def analyze_products(self, products: List[Product], purpose: str) -> Dict[str, Any]:
@@ -84,7 +93,7 @@ class LLMAgent:
                 ],
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"}  # type: ignore
             )
             
             result_text = response.choices[0].message.content

@@ -71,6 +71,31 @@ class AlibabaClient:
             response = requests.post(self.api_endpoint, data=all_params, timeout=self.DEFAULT_TIMEOUT)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.Timeout as e:
+            logging.error(f"API调用超时: {e}")
+            raise AlibabaAPIError(f"API调用超时（{self.DEFAULT_TIMEOUT}秒），请检查网络连接", original_error=e)
+        except requests.exceptions.SSLError as e:
+            logging.error(f"SSL证书错误: {e}")
+            raise AlibabaAPIError("SSL证书验证失败，请检查系统时间或代理设置", original_error=e)
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"网络连接错误: {e}")
+            raise AlibabaAPIError("网络连接失败，请检查网络设置", original_error=e)
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else "未知"
+            logging.error(f"HTTP错误 {status_code}: {e}")
+            error_msg = f"HTTP错误 {status_code}"
+            if isinstance(status_code, int):
+                if status_code == 401:
+                    error_msg += "：认证失败，请检查API密钥和访问令牌"
+                elif status_code == 403:
+                    error_msg += "：权限不足，请检查API访问权限"
+                elif status_code == 404:
+                    error_msg += "：API端点不存在"
+                elif status_code == 429:
+                    error_msg += "：请求过于频繁，请稍后再试"
+                elif status_code >= 500:
+                    error_msg += "：服务器内部错误"
+            raise AlibabaAPIError(error_msg, original_error=e)
         except requests.exceptions.RequestException as e:
             logging.error(f"API调用失败: {e}")
             raise AlibabaAPIError(f"API调用失败: {e}", original_error=e)
@@ -90,30 +115,68 @@ class AlibabaClient:
         Returns:
             商品对象列表
         """
+        # 输入验证
+        if not keyword or not keyword.strip():
+            logging.warning("搜索关键词为空")
+            return []
+        
+        if limit <= 0:
+            limit = 10
+        elif limit > 50:
+            logging.warning(f"请求数量{limit}超过限制，调整为50")
+            limit = 50
+        
         params = {
-            "keywords": keyword,
+            "keywords": keyword.strip(),
             "pageSize": str(limit)
         }
         
-        result = self._call_api(self.API_SEARCH_PRODUCTS, params)
+        try:
+            result = self._call_api(self.API_SEARCH_PRODUCTS, params)
+        except AlibabaAPIError as e:
+            logging.error(f"搜索商品失败: {e}")
+            raise
         
         products = []
-        if isinstance(result, dict) and "result" in result:
-            response_data = result["result"]
+        
+        # 处理多种API响应格式
+        response_data = result
+        if isinstance(result, dict):
+            if "result" in result:
+                response_data = result["result"]
+            elif "error" in result:
+                error_msg = result.get("error", {}).get("message", "未知错误")
+                logging.error(f"API返回错误: {error_msg}")
+                return products
+        
+        if isinstance(response_data, dict):
+            if response_data.get("success", False):
+                data = response_data.get("data", [])
+                if not isinstance(data, list):
+                    logging.warning(f"API返回的data字段不是列表: {type(data)}")
+                    data = []
+                
+                for item in data[:limit]:
+                    if not isinstance(item, dict):
+                        continue
+                    try:
+                        product = Product(
+                            title=item.get("title", ""),
+                            description=item.get("description", ""),
+                            url=item.get("url", ""),
+                            price=item.get("price", ""),
+                            seller=item.get("seller", ""),
+                            image_url=item.get("imageUrl", "")
+                        )
+                        products.append(product)
+                    except Exception as e:
+                        logging.warning(f"创建商品对象失败: {e}, 原始数据: {item}")
+            else:
+                error_code = response_data.get("errorCode", "未知")
+                error_msg = response_data.get("errorMessage", "请求失败")
+                logging.error(f"API请求失败: {error_code} - {error_msg}")
         else:
-            response_data = result
-        if isinstance(response_data, dict) and response_data.get("success", False):
-            data = response_data.get("data", [])
-            for item in data[:limit]:
-                product = Product(
-                    title=item.get("title", ""),
-                    description=item.get("description", ""),
-                    url=item.get("url", ""),
-                    price=item.get("price", ""),
-                    seller=item.get("seller", ""),
-                    image_url=item.get("imageUrl", "")
-                )
-                products.append(product)
+            logging.warning(f"API响应格式异常: {type(response_data)}")
         
         return products
     
