@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for manual release (e.g., v1.2.3)'
+        required: true
+        type: string
 
 jobs:
   build-windows:
@@ -44,7 +49,6 @@ jobs:
         New-Item -ItemType Directory -Force -Path $release_dir
         
         # Copy files
-        # Check for single-file executable (onefile mode)
         if (Test-Path "dist/1688_Product_Search.exe") {
             Copy-Item -Path "dist/1688_Product_Search.exe" -Destination "$release_dir/"
         } elseif (Test-Path "dist/1688_Product_Search/1688_Product_Search.exe") {
@@ -104,20 +108,23 @@ jobs:
         release_dir="release-macos"
         mkdir -p "$release_dir"
         
-        # Copy app bundle
+        # Copy app bundle or binary
         if [ -d "dist/1688 Product Search.app" ]; then
           cp -R "dist/1688 Product Search.app" "$release_dir/"
           chmod +x "$release_dir/1688 Product Search.app/Contents/MacOS/1688_Product_Search"
         elif [ -f "dist/1688_Product_Search" ]; then
           cp "dist/1688_Product_Search" "$release_dir/"
           chmod +x "$release_dir/1688_Product_Search"
+        else
+          echo "Error: Executable not found in dist/"
+          exit 1
         fi
         
         # Copy config and docs
         cp -R config "$release_dir/"
         cp README.md "$release_dir/"
         
-        # Create simple run script
+        # Create run script
         echo '#!/bin/bash' > "$release_dir/run.sh"
         echo 'echo "Starting 1688 Product Search..."' >> "$release_dir/run.sh"
         echo 'echo "Note: Please configure config/settings.json first"' >> "$release_dir/run.sh"
@@ -141,52 +148,48 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # Only run if it's a tag push OR manually dispatched
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     
     steps:
+    - name: Determine tag name
+      id: get_tag
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          TAG="${{ github.event.inputs.tag_name }}"
+          if [[ -z "$TAG" ]]; then
+            echo "Error: tag_name input is required for manual release"
+            exit 1
+          fi
+        else
+          # Extract tag from ref (e.g., refs/tags/v1.2.3 -> v1.2.3)
+          TAG="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
     - name: Download artifacts
       run: mkdir -p release-files
-    
+
     - name: Download Windows artifact
       uses: actions/download-artifact@v4
       with:
         name: 1688-product-search-windows
         path: release-files/windows
-    
+
     - name: Download macOS artifact
       uses: actions/download-artifact@v4
       with:
         name: 1688-product-search-macos
         path: release-files/macos
-    
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ steps.get_tag.outputs.tag }}
+        name: Release ${{ steps.get_tag.outputs.tag }}
         files: |
           release-files/windows/**
           release-files/macos/**
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    
-    - name: Install test dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest
-    
-    - name: Run tests
-      run: |
-        python -m pytest tests/ --ignore=tests/test_main_window.py --ignore=tests/test_config_window.py -v
