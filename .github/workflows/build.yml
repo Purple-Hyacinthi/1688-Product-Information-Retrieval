@@ -150,9 +150,17 @@ jobs:
         name: 1688-product-search-macos
         path: release-files/macos
 
+    - name: Package platform-specific archives
+      run: |
+        # Create clean zip for each platform
+        cd release-files
+        zip -r ../1688-product-search-windows.zip windows/
+        zip -r ../1688-product-search-macos.zip macos/
+        cd ..
+
     - name: Create source code archive
       run: |
-        zip -r source-code.zip . -x "*.git*" -x "release-files/*" -x "release-windows/*" -x "release-macos/*"
+        zip -r source-code.zip . -x "*.git*" -x "release-files/*" -x "1688-product-search-windows.zip" -x "1688-product-search-macos.zip"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -160,10 +168,9 @@ jobs:
         tag_name: ${{ steps.get_tag.outputs.tag }}
         name: Release ${{ steps.get_tag.outputs.tag }}
         files: |
-          release-files/windows/**
-          release-files/macos/**
+          1688-product-search-windows.zip
+          1688-product-search-macos.zip
           source-code.zip
-        overwrite_files: true
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
