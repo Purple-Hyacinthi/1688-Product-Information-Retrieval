@@ -137,7 +137,7 @@ jobs:
         chmod +x "$release_dir/run.sh"
     
     - name: Upload macOS artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/download-artifact@v4
       with:
         name: 1688-product-search-macos
         path: release-macos/
@@ -190,6 +190,7 @@ jobs:
         files: |
           release-files/windows/**
           release-files/macos/**
+        overwrite_files: true  # ✅ 关键修复：添加此参数
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
