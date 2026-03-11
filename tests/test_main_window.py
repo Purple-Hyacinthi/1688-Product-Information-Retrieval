@@ -6,7 +6,7 @@ from src.main_window import MainWindow
 
 @patch('tkinter.Toplevel', autospec=True)
 @patch('tkinter.Tk', autospec=True)
-@pytest.mark.skip(reason='Skipping GUI tests in headless environment')
+# Removing GUI test
 def test_main_window_creation(mock_tk, mock_toplevel):
     root = tk.Tk()
     root.withdraw()  # 隐藏窗口
@@ -28,7 +28,7 @@ def test_main_window_creation(mock_tk, mock_toplevel):
 @patch('tkinter.messagebox.showwarning')
 @patch('tkinter.Toplevel', autospec=True)
 @patch('tkinter.Tk', autospec=True)
-@pytest.mark.skip(reason='Skipping GUI tests in headless environment')
+# Removing GUI test
 def test_search_products_validation(mock_tk, mock_toplevel, mock_showwarning):
     root = tk.Tk()
     root.withdraw()
@@ -51,7 +51,7 @@ def test_search_products_validation(mock_tk, mock_toplevel, mock_showwarning):
 
 @patch('tkinter.Toplevel', autospec=True)
 @patch('tkinter.Tk', autospec=True)
-@pytest.mark.skip(reason='Skipping GUI tests in headless environment')
+# Removing GUI test
 def test_toggle_agent_mode(mock_tk, mock_toplevel):
     root = tk.Tk()
     root.withdraw()
@@ -80,7 +80,7 @@ def test_toggle_agent_mode(mock_tk, mock_toplevel):
 
 @patch('tkinter.Toplevel', autospec=True)
 @patch('tkinter.Tk', autospec=True)
-@pytest.mark.skip(reason='Skipping GUI tests in headless environment')
+# Removing GUI test
 def test_update_results(mock_tk, mock_toplevel):
     root = tk.Tk()
     root.withdraw()
@@ -114,7 +114,7 @@ def test_update_results(mock_tk, mock_toplevel):
 @patch('threading.Thread')
 @patch('tkinter.Toplevel', autospec=True)
 @patch('tkinter.Tk', autospec=True)
-@pytest.mark.skip(reason='Skipping GUI tests in headless environment')
+# Removing GUI test
 def test_perform_search(mock_tk, mock_toplevel, mock_thread):
     root = tk.Tk()
     root.withdraw()
